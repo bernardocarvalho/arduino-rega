@@ -19,9 +19,10 @@ ser = serial.Serial('/dev/ttyUSB0', baudrate = 115200, parity=serial.PARITY_NONE
 ser.flushInput()
 
 try:
-    with open("measurments.csv","a") as csvfile:
+    with open("measurments.csv",'a') as csvfile:
         log = csv.writer(csvfile, delimiter=",",quotechar=" ", quoting=csv.QUOTE_MINIMAL)
-        logcols = ["timestamp       ","sec","Hum 1","Temp 1"," Hum 2","Temp 2","H20 Meas","H2O Pump"]
+        logcols = ["timestamp","sec","Hum_1","Temp_1"," Hum_2",'Temp_2','H20_Meas']
+        #logcols = ["timestamp","sec","Hum_1","Temp_1"," Hum_2","Temp_2","H20_Meas",'H2O_Pump']
         log.writerow(logcols)
         while True:
             ser_bytes = ser.readline()

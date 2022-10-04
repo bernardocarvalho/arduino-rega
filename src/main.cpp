@@ -51,11 +51,11 @@ const int T_PIN = SCL; //  PC5
 #define M_PIN 4 // PD4 
 
 //volatile int pwm_hvalue = 0, pwm_t1value = 0, cnt_t1, cnt_h1;
-volatile long prev_h1time, prev_t1time, pwm_t1, pwm_h1;
-volatile int cnt_t1=0, cnt_h1=0, cnt_m=0;
+volatile unsigned long prev_h1time, prev_t1time, pwm_t1, pwm_h1;
+volatile unsigned long cnt_t1=0, cnt_h1=0, cnt_m=0;
 
-volatile int cnt_t2, cnt_h2;
-volatile long prev_h2time, prev_t2time, pwm_t2, pwm_h2;
+volatile unsigned long cnt_t2, cnt_h2;
+volatile unsigned long prev_h2time, prev_t2time, pwm_t2, pwm_h2;
 
 volatile unsigned long ena_irq;
 const int irq_sleep = 1000; // 1 sec
@@ -133,7 +133,7 @@ void setup() {
  
 void print_loop(unsigned long now) {
     static unsigned long nextTime = 0;
-    const long print_interval = 1000;
+    const long print_interval = 30000;
     static bool led_state = false;
 
 //    unsigned long now = millis();	
@@ -171,7 +171,7 @@ void loop(){
     unsigned long now = millis();	
     if (now > ena_irq){ 
         enableInterrupt(M_PIN, m_falling, FALLING);
-   	ena_irq += 1000000; // run once per 1000 s
+   	ena_irq += 1000000; // run once until next interrupt.  ~ 1000 s
     }
     serial_commands_.ReadSerial();
     print_loop(now);
