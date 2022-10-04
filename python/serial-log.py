@@ -11,7 +11,7 @@ import serial
 import time
 import csv, time, datetime
 
-#filename="log-file.txt"
+
 #datafile=open(filename, 'a')
 
 ser = serial.Serial('/dev/ttyUSB0', baudrate = 115200, parity=serial.PARITY_NONE, \
@@ -20,9 +20,7 @@ ser.flushInput()
 
 try:
     with open("measurments.csv","a") as csvfile:
-# ser_bytes = ser.readline()
         log = csv.writer(csvfile, delimiter=",",quotechar=" ", quoting=csv.QUOTE_MINIMAL)
-        #logcols = ["timestamp","pm2.5","pm10","device_id"]
         logcols = ["timestamp       ","sec","Hum 1","Temp 1"," Hum 2","Temp 2","H20 Meas","H2O Pump"]
         log.writerow(logcols)
         while True:
@@ -34,11 +32,8 @@ try:
             log.writerow(vals)
             csvfile.flush()
             print(vals)
-        #    print(ser_line)
         #datafile.write(str(time.time()) + str(ser_line))
     
 except KeyboardInterrupt:
-#        datafile.close()
-        ser.close()
-        print("Keyboard Interrupt")
-        #break
+    ser.close()
+    print("Keyboard Interrupt")
