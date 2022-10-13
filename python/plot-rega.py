@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # vim: sta:et:sw=4:ts=4:sts=4
 
 import sys
