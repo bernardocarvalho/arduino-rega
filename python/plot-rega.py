@@ -27,10 +27,9 @@ x, y = df.Temp_0.min(), df.Temp_0.max()
 df['1/T0S'] = 300.0 / (df.Temp_0 - 200.0)
 
 x, y = df.Hum_LT.min(), df.Hum_LT.max()
-## 3190.79 7340.12
-# 498.8 775.8
-#df['H2S'] = (df.Hum_2 - x) / (y - x)
-df['HLT'] = df.Hum_LT / 800.0
+ #df['H2S'] = (df.Hum_2 - x) / (y - x)
+#53.6 63.6
+df['HLT'] = df.Hum_LT / 60.0
 x, y = df.Temp_LT.min(), df.Temp_LT.max()
 #df['T2S'] = (df.Temp_2 - x) / (y - x)
 df['1/TLT'] = 500.0 / df.Temp_LT
@@ -46,14 +45,16 @@ df['1/TRB'] = 1000.0 / df.Temp_RB
 
 x, y = df.Hum_RT.min(), df.Hum_RT.max()
 # 83299.45  86559.42
-df['HRT'] = (df.Hum_RT - 83000) / 6000.0
+df['HRT'] = (df.Hum_RT - 20000) / 60000.0
 
 
 x, y = df.Temp_RT.min(), df.Temp_RT.max()
 # 634.69 992.98
-df['1/TRT'] = 600.0 / df.Temp_RT
+# 868.0 1034.0
+df['1/TRT'] = 800.0 / df.Temp_RT
 
 #df.plot(x='timestamp', y=['1/H0S', '1/T0S', 'HLT','1/TLT', '1/HRB','1/TRB'])
-df.plot(x='timestamp', y=['1/H0S', '1/T0S', 'HLT','1/TLT', '1/HRB','1/TRB', 'HRT','1/TRT'])
+#df.plot(x='timestamp', y=['1/H0S', '1/T0S', 'HLT','1/TLT', '1/HRB','1/TRB', 'HRT','1/TRT'])
+df.plot(x='timestamp', y=['1/H0S', '1/T0S', 'HLT','1/TLT', '1/TRB', 'HRT','1/TRT'])
 plt.show()
 

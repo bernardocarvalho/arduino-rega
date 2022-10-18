@@ -35,7 +35,7 @@ const int M_PIN = 3;  // PD3
 
 const int TRT_PIN = 6; // PD6 Yellow Sensor
 const int HRT_PIN = 7;
-unsigned long ena_irq, stop_valve, ena_sensor_irq;  // in millis()
+unsigned long ena_irq,  ena_sensor_irq;  // in millis()
 
 unsigned long prev_time_h0, prev_time_t0, prd_t0, prd_h0;
 unsigned long cnt_t0=0, cnt_h0=0, cnt_m=0;
@@ -47,11 +47,12 @@ volatile unsigned long prev_time_hlt, prev_time_tlt, prd_tlt, prd_hlt,
          cnt_hlt, cnt_tlt;
 volatile unsigned long prev_time_hrb, prev_time_trb, prd_trb, prd_hrb,
          cnt_hrb, cnt_trb;
-volatile unsigned long prev_time_hrt, prev_time_trt, prd_hrt, prd_trt,
+unsigned long prev_time_hrt, prev_time_trt, prd_hrt, prd_trt,
          cnt_hrt, cnt_trt;
 
 const int irq_sleep = 1000; // 1 sec
 
+time_t stop_valve = 0, next_rega = 0;
 
 void printDigits(int digits){
     // utility function for digital clock display: prints preceding colon and leading 0
@@ -101,7 +102,7 @@ void cmd_datetime_set(SerialCommands* sender)
     time_t ts = strtoul(ts_str, NULL, 0); //atoi(ts_str);
     setTime(ts);
     time_t t = now();
-    sender->GetSerial()->println(ts);
+    //sender->GetSerial()->println(ts);
     sender->GetSerial()->println(t);
 }
 
@@ -115,9 +116,11 @@ void cmd_relay_on(SerialCommands* sender)
         return;
     }
     int min = atoi(min_str);
-    stop_valve = millis() + 60000 * min;
+    //stop_valve = millis() + 60000 * min;
+    stop_valve = now() + 60 * min;
+    next_rega  = now() + 24 * 3600; // Next day, same hour
     relayState = true;
-    digitalWrite(relayPin, relayState);
+    digitalWrite(relayPin, relayState);§
     sender->GetSerial()->print(F("Relay is on for: "));
     sender->GetSerial()->println(min);
 }
@@ -296,57 +299,63 @@ void loop(){
     static unsigned long nextPtime = 0;
     const long print_interval = 3 * 1000;
 
-    unsigned long now = millis();	
-
-    if (now > ena_irq){  // debouncing 
+    unsigned long now_ms = millis();	
+    if (now_ms > ena_irq){  // debouncing 
         enableInterrupt(M_PIN, m_falling, FALLING);
         ena_irq += 1000000; // run once until next interrupt.  ~ 1000 s
     }
-    if (now > stop_valve){
+
+    time_t now_ts = now();
+    if (now_ts > next_rega){
+        relayState = true;
+        digitalWrite(relayPin, relayState);
+        stop_valve = now_ts + 60;
+    }
+    if (now_ts > stop_valve){
         relayState = false;
         digitalWrite(relayPin, relayState);
     }
 
     unsigned long us = micros();
-    if ((now > ena_sensor_irq + 20) && t0){
+    if ((now_ms > ena_sensor_irq + 20) && t0){
     	prev_time_t0 = us;
     	enableInterrupt(T0_PIN, t0_falling, FALLING);
 	t0 = false;
     }
-    if ((now > ena_sensor_irq + 100) && hlt){
+    if ((now_ms > ena_sensor_irq + 100) && hlt){
     	prev_time_hlt = us;
     	enableInterrupt(HLT_PIN, hlt_falling, FALLING);
 	hlt = false;
     }
-    if ((now > ena_sensor_irq + 150) && tlt){
+    if ((now_ms > ena_sensor_irq + 150) && tlt){
     	prev_time_tlt = us;
     	enableInterrupt(TLT_PIN, tlt_falling, FALLING);
 	tlt = false;
     }
-    if ((now > ena_sensor_irq + 200) && hrb){
+    if ((now_ms > ena_sensor_irq + 200) && hrb){
     	prev_time_hrb = us;
     	enableInterrupt(HRB_PIN, hrb_falling, FALLING);
 	hrb = false;
     }
-    if ((now > ena_sensor_irq + 4000) && trb){
+    if ((now_ms > ena_sensor_irq + 4000) && trb){
     	prev_time_trb = us;
     	enableInterrupt(TRB_PIN, trb_falling, FALLING);
 	trb = false;
     }
-    if ((now > ena_sensor_irq + 4050) && hrt){
+    if ((now_ms > ena_sensor_irq + 4050) && hrt){
     	prev_time_hrt = us;
     	enableInterrupt(HRT_PIN, hrt_falling, FALLING);
 	hrt = false;
     }
-    if ((now > ena_sensor_irq + 8000) && trt){
+    if ((now_ms > ena_sensor_irq + 8000) && trt){
     	prev_time_trt = us;
     	enableInterrupt(TRT_PIN, trt_falling, FALLING);
 	trt = false;
     }
     serial_commands_.ReadSerial();
-    if ( now > nextPtime ) {
-        nextPtime = now + print_interval;
-        print_loop(now);
+    if ( now_ms > nextPtime ) {
+        nextPtime = now_ms + print_interval;
+        print_loop(now_ms);
     }
 }
 
