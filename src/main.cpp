@@ -10,6 +10,11 @@
 #include <TimeLib.h>
 #include <SerialCommands.h>
 
+/*
+ * /dev/ttyS1 on BeagleBone Black
+ * Arduino TX: BB: UART1_RX – Pin26
+ *         RX: BB: UART1_TX – Pin24
+ */
 const int N_IRQ = 20;
 
 const int T0_PIN = SCL; //  PC5/A5
@@ -297,7 +302,7 @@ void print_loop(unsigned long now_ms) {
 
 void loop(){
     static unsigned long nextPtime = 0;
-    const long print_interval = 3 * 1000;
+    const long print_interval = 30 * 1000;
 
     unsigned long now_ms = millis();	
     if (now_ms > ena_irq){  // debouncing 
