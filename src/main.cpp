@@ -85,21 +85,18 @@ char serial_command_buffer_[32];
 SerialCommands serial_commands_(&Serial, serial_command_buffer_, sizeof(serial_command_buffer_), "\r\n", " ");
 
 //This is the default handler, and gets called when no other command matches.
-void cmd_unrecognized(SerialCommands* sender, const char* cmd)
-{
+void cmd_unrecognized(SerialCommands* sender, const char* cmd) {
     sender->GetSerial()->print("Unrecognized command [");
     sender->GetSerial()->print(cmd);
     sender->GetSerial()->println("]");
 }
 //expects one single parameter
-void cmd_datetime_set(SerialCommands* sender)
-{
+void cmd_datetime_set(SerialCommands* sender) {
     //Note: Every call to Next moves the pointer to next parameter
     // Use date +%s to get Linux Timestamp
 
     char* ts_str = sender->Next();
-    if (ts_str == NULL)
-    {
+    if (ts_str == NULL) {
         sender->GetSerial()->println("ERROR NO_TS");
         return;
     }
@@ -112,8 +109,7 @@ void cmd_datetime_set(SerialCommands* sender)
 }
 
 //called for ON command
-void cmd_relay_on(SerialCommands* sender)
-{
+void cmd_relay_on(SerialCommands* sender) {
     char * min_str = sender->Next();
     if (min_str == NULL) {
         sender->GetSerial()->println("ERROR Minute Arg");
