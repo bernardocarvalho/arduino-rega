@@ -10,8 +10,10 @@
 #include <TimeLib.h>
 #include <SerialCommands.h>
 
-const int T_PIN = SCL; //  PC5/A5
-const int H_PIN = SDA; //  PC4/A4 Blue wire on sensor
+const int N_IRQ = 20;
+
+const int T0_PIN = SCL; //  PC5/A5
+const int H0_PIN = SDA; //  PC4/A4 Blue wire on sensor
 
 const int TLT_PIN = A2; // PC2 Yellow Sensor
 const int HLT_PIN = A3; // PC3 Blue
@@ -28,22 +30,24 @@ const int HRB_PIN = A1;
  PB5 13 LED_BUILTIN
  */
 const int relayPin = 2; // PD2
+volatile bool relayState = false;
 const int M_PIN = 3;  // PD3 
 
 const int TRT_PIN = 6; // PD6 Yellow Sensor
 const int HRT_PIN = 7;
-volatile unsigned long ena_irq, stop_valve;  // in millis()
+unsigned long ena_irq, stop_valve, ena_sensor_irq;  // in millis()
 
-volatile unsigned long prev_h1time, prev_t1time, pwm_t1, pwm_h1;
-volatile unsigned long cnt_t1=0, cnt_h1=0, cnt_m=0;
+unsigned long prev_time_h0, prev_time_t0, prd_t0, prd_h0;
+unsigned long cnt_t0=0, cnt_h0=0, cnt_m=0;
+bool t0, hlt, tlt, hrb, trb, hrt, trt;
 
 //volatile unsigned long cnt_t2, cnt_h2;
 
-volatile unsigned long prev_time_hlt, prev_time_tlt, pwm_tlt, pwm_hlt,
+volatile unsigned long prev_time_hlt, prev_time_tlt, prd_tlt, prd_hlt,
          cnt_hlt, cnt_tlt;
-volatile unsigned long prev_time_hrb, prev_time_trb, pwm_trb, pwm_hrb,
+volatile unsigned long prev_time_hrb, prev_time_trb, prd_trb, prd_hrb,
          cnt_hrb, cnt_trb;
-volatile unsigned long prev_time_hrt, prev_time_trt, pwm_hrt, pwm_trt,
+volatile unsigned long prev_time_hrt, prev_time_trt, prd_hrt, prd_trt,
          cnt_hrt, cnt_trt;
 
 const int irq_sleep = 1000; // 1 sec
@@ -112,16 +116,17 @@ void cmd_relay_on(SerialCommands* sender)
     }
     int min = atoi(min_str);
     stop_valve = millis() + 60000 * min;
-    digitalWrite(relayPin, HIGH);
+    relayState = true;
+    digitalWrite(relayPin, relayState);
     sender->GetSerial()->print(F("Relay is on for: "));
     sender->GetSerial()->println(min);
-//    sender->GetSerial()->println("relay is off");
 }
 
 //called for OFF command
 void cmd_relay_off(SerialCommands* sender)
 {
-    digitalWrite(relayPin, LOW);
+    relayState = false;
+    digitalWrite(relayPin, relayState);
     sender->GetSerial()->println("relay is off");
 }
 
@@ -131,70 +136,78 @@ SerialCommand cmd_relay_off_("OFF", cmd_relay_off);
 SerialCommand cmd_datetime_set_("TS", cmd_datetime_set); // requires one argument
 
 // Funtion prototypes
-void h1_falling() {
+void t0_falling() {
     unsigned long us;
-    us = micros();
-    pwm_h1 += us - prev_h1time;
-    prev_h1time = us;
-    cnt_h1++;
+    if(cnt_t0++ > N_IRQ) {
+	disableInterrupt(T0_PIN);
+        us = micros();
+    	prd_t0 = us - prev_time_t0;
+	cnt_t0 = 0;
+    };
 }
-void t1_falling() {
+void h0_falling() {
     unsigned long us;
-    us = micros();
-    pwm_t1 += us - prev_t1time;
-    prev_t1time = us;
-    cnt_t1++;
-}
-void hrb_falling() {
-    unsigned long us = micros();
-    pwm_hrb += us - prev_time_hrb;
-    prev_time_hrb = us;
-    cnt_hrb++;
-}
-void trb_falling() {
-    unsigned long us = micros();
-    pwm_trb += us - prev_time_trb;
-    prev_time_trb = us;
-    cnt_trb++;
+    if(cnt_h0++ > N_IRQ) {
+    	
+	disableInterrupt(H0_PIN);
+        us = micros();
+    	prd_h0 = us - prev_time_h0;
+	cnt_h0 = 0;
+    };
 }
 void hlt_falling() {
-    unsigned long us = micros();
-    pwm_hlt += us - prev_time_hlt;
-    prev_time_hlt = us;
-    cnt_hlt++;
+    if(cnt_hlt++ > N_IRQ) {
+	disableInterrupt(HLT_PIN);
+    	prd_hlt = micros() - prev_time_hlt;
+	cnt_hlt = 0;
+    };
 }
 void tlt_falling() {
-    unsigned long us = micros();
-    pwm_tlt += us - prev_time_tlt;
-    prev_time_tlt = us;
-    cnt_tlt++;
+    if(cnt_tlt++ > N_IRQ) {
+	disableInterrupt(TLT_PIN);
+    	prd_tlt = micros() - prev_time_tlt;
+	cnt_tlt = 0;
+    };
 }
+void hrb_falling() {
+    if(cnt_hrb++ > N_IRQ) {
+	disableInterrupt(HRB_PIN);
+    	prd_hrb = micros() - prev_time_hrb;
+	cnt_hrb = 0;
+    };
+}
+void trb_falling() {
+    if(cnt_trb++ > N_IRQ) {
+	disableInterrupt(TRB_PIN);
+    	prd_trb = micros()- prev_time_trb;
+	cnt_trb = 0;
+    };
+}
+void hrt_falling() {
+    if(cnt_hrt++ > N_IRQ) {
+	disableInterrupt(HRT_PIN);
+    	prd_hrt = micros() - prev_time_hrt;
+	cnt_hrt = 0;
+    };
+}
+void trt_falling() {
+    if(cnt_trt++ > N_IRQ) {
+	disableInterrupt(TRT_PIN);
+    	prd_trt = micros() - prev_time_trt;
+	cnt_trt = 0;
+    };
+}
+
 void m_falling() {
     disableInterrupt(M_PIN);
     ena_irq = millis() + irq_sleep; // Debouncing reed sensor
     cnt_m++;
 }
 
-void hrt_falling() {
-    unsigned long us = micros();
-    static bool p_state = false;
-    pwm_hrt += us - prev_time_hrt;
-    prev_time_hrt = us;
-    cnt_hrt++;
-    //digitalWrite(D2, p_state);
-    p_state = not p_state;
-}
-void trt_falling() {
-    unsigned long us = micros();
-    pwm_trt += us - prev_time_trt;
-    prev_time_trt = us;
-    cnt_trt++;
-}
-
 void setup() {
     Serial.begin(115200);
-    pinMode(H_PIN, INPUT_PULLUP);
-    pinMode(T_PIN, INPUT_PULLUP);
+    pinMode(H0_PIN, INPUT_PULLUP);
+    pinMode(T0_PIN, INPUT_PULLUP);
     pinMode(HLT_PIN, INPUT_PULLUP);
     pinMode(TLT_PIN, INPUT_PULLUP);
     pinMode(HRB_PIN, INPUT_PULLUP);
@@ -206,7 +219,8 @@ void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
 
     pinMode(relayPin, OUTPUT);
-    digitalWrite(relayPin, LOW);
+    relayState = false;
+    digitalWrite(relayPin, relayState);
 
     serial_commands_.SetDefaultHandler(cmd_unrecognized);
     serial_commands_.AddCommand(&cmd_relay_on_);
@@ -214,136 +228,125 @@ void setup() {
     serial_commands_.AddCommand(&cmd_datetime_set_);
 
     Serial.print(F("Hello, now is "));
-    // Hello, now is 1664892600
 
     //setTime(hr,min,sec,day,month,yr); // Another way to set
-    setTime(18,10,1,11,10,2022); 
+    setTime(18,10,1,13,10,2022); 
     time_t t = now(); // Store the current time in time 
     // get Linux date : date +%s
     Serial.println(t);
     Serial.println(F("timestamp,sec,Hum_0,Temp_0,Hum_LT,Temp_LT,Hum_RB,Temp_RB,Hum_RT,Temp_RT,H20_Meas,H2O_Pump"));
 
-    enableInterrupt(H_PIN, h1_falling, FALLING);
-    enableInterrupt(T_PIN, t1_falling, FALLING);
-    enableInterrupt(HLT_PIN, hlt_falling, FALLING);
-    enableInterrupt(TLT_PIN, tlt_falling, FALLING);
-    enableInterrupt(HRB_PIN, hrb_falling, FALLING);
-    enableInterrupt(TRB_PIN, trb_falling, FALLING);
-    enableInterrupt(HRT_PIN, hrt_falling, FALLING);
-    enableInterrupt(TRT_PIN, trt_falling, FALLING);
-
+    enableInterrupt(H0_PIN, h0_falling, FALLING);
     enableInterrupt(M_PIN, m_falling, FALLING);
-    unsigned long us = micros();
-    prev_h1time = us;
-    prev_t1time = us;
-    prev_time_hrb = us;
-    prev_time_trb = us;
-    prev_time_hrt = us;
-    prev_time_trt = us;
-    prev_time_hlt = us;
-    prev_time_tlt = us;
     stop_valve = 0; // in millis
+    ena_sensor_irq= millis();
 }
 
 void print_loop(unsigned long now_ms) {
-    static unsigned long nextTime = 0;
     static bool led_state = false;
-    const long print_interval = 30 * 1000;
-
-    if ( now_ms > nextTime ) {
-        nextTime = now_ms + print_interval;
 
         digitalClockDisplay();
         Serial.print(F(", ")); Serial.print(now_ms/1000);
-        float hval = ((float) pwm_h1 ) / cnt_h1; 
-        pwm_h1 = 0; cnt_h1 = 0;
+        float hval = ((float) prd_h0 ); 
+        hval = hval / N_IRQ;
+        prd_h0 = 0; cnt_h0 = 0;
         Serial.print(F(", ")); Serial.print(hval);
-        //float tval = ((float) pwm_t1 ); // cnt_t1; 
-        float tval = ((float) pwm_t1 ) / cnt_t1; 
-        pwm_t1 = 0; cnt_t1 = 0;
+        //float tval = ((float) pwm_t0 ); // cnt_t0; 
+        float tval = (float) prd_t0; 
+        tval = tval / N_IRQ;
         Serial.print(F(", ")); Serial.print(tval);
 
-        hval = ((float) pwm_hlt ) / cnt_hlt; 
-        pwm_hlt = 0; cnt_hlt = 0;
+        hval = (float) prd_hlt; 
+        hval = hval / N_IRQ;
         Serial.print(F(", ")); Serial.print(hval);
-        tval = ((float) pwm_tlt ) / cnt_tlt; 
-        pwm_tlt = 0; cnt_tlt = 0;
+        tval = (float) prd_tlt; 
+        tval = tval / N_IRQ;
         Serial.print(F(", ")); Serial.print(tval);
 
-        hval = ((float) pwm_hrb ) / cnt_hrb; 
-        pwm_hrb = 0; cnt_hrb = 0;
+        hval = (float) prd_hrb; 
+        hval = hval / N_IRQ;
         Serial.print(F(", ")); Serial.print(hval);
-        tval = ((float) pwm_trb ) / cnt_trb; 
-        pwm_trb = 0; cnt_trb = 0;
+        tval = (float) prd_trb; 
+        tval = tval / N_IRQ;
         Serial.print(F(", ")); Serial.print(tval);
 
-        hval = ((float) pwm_hrt ) / cnt_hrt; 
-        pwm_hrt = 0; cnt_hrt = 0;
+        hval = (float) prd_hrt; 
+        hval = hval / N_IRQ;
         Serial.print(F(", ")); Serial.print(hval);
-        tval = ((float) pwm_trt ) / cnt_trt; 
-        pwm_trt = 0; cnt_trt = 0;
+        tval = (float) prd_trt; 
+        tval = tval / N_IRQ;
         Serial.print(F(", ")); Serial.print(tval);
 
         Serial.print(F(", ")); Serial.print(cnt_m);
 
-        Serial.println(F(", 0"));
+        Serial.print(F(", ")); Serial.println(relayState);
+        //Serial.println(F(", 0"));
 
         digitalWrite(LED_BUILTIN, led_state);
         led_state = not led_state;
-    }
+    	prev_time_h0 = micros();
+	enableInterrupt(H0_PIN, h0_falling, FALLING);
+	ena_sensor_irq = millis(); // start Interrupt Cycle
+	t0 = true; hlt = true; tlt = true; hrb = true; trb = true; hrt = true; trt = true;  // enable irq flags
+    //}
     //delay(1000);
 }
 
 void loop(){
+    static unsigned long nextPtime = 0;
+    const long print_interval = 3 * 1000;
+
     unsigned long now = millis();	
+
     if (now > ena_irq){  // debouncing 
         enableInterrupt(M_PIN, m_falling, FALLING);
         ena_irq += 1000000; // run once until next interrupt.  ~ 1000 s
     }
-    if (now > stop_valve)
-    	digitalWrite(relayPin, LOW);
+    if (now > stop_valve){
+        relayState = false;
+        digitalWrite(relayPin, relayState);
+    }
+
+    unsigned long us = micros();
+    if ((now > ena_sensor_irq + 20) && t0){
+    	prev_time_t0 = us;
+    	enableInterrupt(T0_PIN, t0_falling, FALLING);
+	t0 = false;
+    }
+    if ((now > ena_sensor_irq + 100) && hlt){
+    	prev_time_hlt = us;
+    	enableInterrupt(HLT_PIN, hlt_falling, FALLING);
+	hlt = false;
+    }
+    if ((now > ena_sensor_irq + 150) && tlt){
+    	prev_time_tlt = us;
+    	enableInterrupt(TLT_PIN, tlt_falling, FALLING);
+	tlt = false;
+    }
+    if ((now > ena_sensor_irq + 200) && hrb){
+    	prev_time_hrb = us;
+    	enableInterrupt(HRB_PIN, hrb_falling, FALLING);
+	hrb = false;
+    }
+    if ((now > ena_sensor_irq + 4000) && trb){
+    	prev_time_trb = us;
+    	enableInterrupt(TRB_PIN, trb_falling, FALLING);
+	trb = false;
+    }
+    if ((now > ena_sensor_irq + 4050) && hrt){
+    	prev_time_hrt = us;
+    	enableInterrupt(HRT_PIN, hrt_falling, FALLING);
+	hrt = false;
+    }
+    if ((now > ena_sensor_irq + 8000) && trt){
+    	prev_time_trt = us;
+    	enableInterrupt(TRT_PIN, trt_falling, FALLING);
+	trt = false;
+    }
     serial_commands_.ReadSerial();
-    print_loop(now);
+    if ( now > nextPtime ) {
+        nextPtime = now + print_interval;
+        print_loop(now);
+    }
 }
 
-/*
-   void h_rising() {
-//latest_interrupted_pin=PCintPort::arduinoPin;
-// PCintPort::at    static bool state;tachInterrupt(latest_interrupted_pin, &falling, FALLING);
-disableInterrupt(H_PIN);
-enableInterrupt(H_PIN, h_falling, FALLING);
-pwm_hvalue = micros() - prev_htime;
-pwm_h += pwm_hvalue;
-cnt_h++;
-}
-void t_rising() {
-disableInterrupt(T_PIN);
-enableInterrupt(T_PIN, t_falling, FALLING);
-pwm_tvalue = micros() - prev_ttime;
-pwm_t += pwm_tvalue;
-cnt_t++;
-}
-*/
-/*
-   void h_falling() {
-   disableInterrupt(H_PIN); enableInterrupt(H_PIN, h_rising, RISING);
-   prev_htime = micros();
-   }
-   void t_falling() {
-   disableInterrupt(T_PIN); enableInterrupt(T_PIN, t_rising, RISING);
-   prev_ttime = micros();
-   }
-
-   void h2_rising() {
-   disableInterrupt(H2_PIN);
-   enableInterrupt(H2_PIN, h2_falling, FALLING);
-   pwm_h2 += micros() - prev_h2time;
-   cnt_h2++;
-   }
-   void t2_rising() {
-   disableInterrupt(T2_PIN);
-   enableInterrupt(T2_PIN, t2_falling, FALLING);
-   pwm_t2 += micros() - prev_t2time;
-   cnt_t2++;
-   }
-   */
