@@ -53,7 +53,7 @@ volatile unsigned long prev_time_hlt, prev_time_tlt, prd_tlt, prd_hlt,
 volatile unsigned long prev_time_hrb, prev_time_trb, prd_trb, prd_hrb,
          cnt_hrb, cnt_trb;
 unsigned long prev_time_hrt, prev_time_trt, prd_hrt, prd_trt,
-         cnt_hrt, cnt_trt;
+              cnt_hrt, cnt_trt;
 
 const int irq_sleep = 1000; // 1 sec
 
@@ -115,8 +115,7 @@ void cmd_datetime_set(SerialCommands* sender)
 void cmd_relay_on(SerialCommands* sender)
 {
     char * min_str = sender->Next();
-    if (min_str == NULL)
-    {
+    if (min_str == NULL) {
         sender->GetSerial()->println("ERROR Minute Arg");
         return;
     }
@@ -125,14 +124,13 @@ void cmd_relay_on(SerialCommands* sender)
     stop_valve = now() + 60 * min;
     next_rega  = now() + 24 * 3600; // Next day, same hour
     relayState = true;
-    digitalWrite(relayPin, relayState);§
+    digitalWrite(relayPin, relayState);
     sender->GetSerial()->print(F("Relay is on for: "));
     sender->GetSerial()->println(min);
 }
 
 //called for OFF command
-void cmd_relay_off(SerialCommands* sender)
-{
+void cmd_relay_off(SerialCommands* sender) {
     relayState = false;
     digitalWrite(relayPin, relayState);
     sender->GetSerial()->println("relay is off");
@@ -147,62 +145,61 @@ SerialCommand cmd_datetime_set_("TS", cmd_datetime_set); // requires one argumen
 void t0_falling() {
     unsigned long us;
     if(cnt_t0++ > N_IRQ) {
-	disableInterrupt(T0_PIN);
+        disableInterrupt(T0_PIN);
         us = micros();
-    	prd_t0 = us - prev_time_t0;
-	cnt_t0 = 0;
+        prd_t0 = us - prev_time_t0;
+        cnt_t0 = 0;
     };
 }
 void h0_falling() {
     unsigned long us;
     if(cnt_h0++ > N_IRQ) {
-    	
-	disableInterrupt(H0_PIN);
+        disableInterrupt(H0_PIN);
         us = micros();
-    	prd_h0 = us - prev_time_h0;
-	cnt_h0 = 0;
+        prd_h0 = us - prev_time_h0;
+        cnt_h0 = 0;
     };
 }
 void hlt_falling() {
     if(cnt_hlt++ > N_IRQ) {
-	disableInterrupt(HLT_PIN);
-    	prd_hlt = micros() - prev_time_hlt;
-	cnt_hlt = 0;
+        disableInterrupt(HLT_PIN);
+        prd_hlt = micros() - prev_time_hlt;
+        cnt_hlt = 0;
     };
 }
 void tlt_falling() {
     if(cnt_tlt++ > N_IRQ) {
-	disableInterrupt(TLT_PIN);
-    	prd_tlt = micros() - prev_time_tlt;
-	cnt_tlt = 0;
+        disableInterrupt(TLT_PIN);
+        prd_tlt = micros() - prev_time_tlt;
+        cnt_tlt = 0;
     };
 }
 void hrb_falling() {
     if(cnt_hrb++ > N_IRQ) {
-	disableInterrupt(HRB_PIN);
-    	prd_hrb = micros() - prev_time_hrb;
-	cnt_hrb = 0;
+        disableInterrupt(HRB_PIN);
+        prd_hrb = micros() - prev_time_hrb;
+        cnt_hrb = 0;
     };
 }
 void trb_falling() {
     if(cnt_trb++ > N_IRQ) {
-	disableInterrupt(TRB_PIN);
-    	prd_trb = micros()- prev_time_trb;
-	cnt_trb = 0;
+        disableInterrupt(TRB_PIN);
+        prd_trb = micros()- prev_time_trb;
+        cnt_trb = 0;
     };
 }
 void hrt_falling() {
     if(cnt_hrt++ > N_IRQ) {
-	disableInterrupt(HRT_PIN);
-    	prd_hrt = micros() - prev_time_hrt;
-	cnt_hrt = 0;
+        disableInterrupt(HRT_PIN);
+        prd_hrt = micros() - prev_time_hrt;
+        cnt_hrt = 0;
     };
 }
 void trt_falling() {
     if(cnt_trt++ > N_IRQ) {
-	disableInterrupt(TRT_PIN);
-    	prd_trt = micros() - prev_time_trt;
-	cnt_trt = 0;
+        disableInterrupt(TRT_PIN);
+        prd_trt = micros() - prev_time_trt;
+        cnt_trt = 0;
     };
 }
 
@@ -240,7 +237,7 @@ void setup() {
     //setTime(hr,min,sec,day,month,yr); // Another way to set
     setTime(18,10,1,13,10,2022); 
     time_t t = now(); // Store the current time in time 
-    // get Linux date : date +%s
+                      // get Linux date : date +%s
     Serial.println(t);
     Serial.println(F("timestamp,sec,Hum_0,Temp_0,Hum_LT,Temp_LT,Hum_RB,Temp_RB,Hum_RT,Temp_RT,H20_Meas,H2O_Pump"));
 
@@ -253,52 +250,52 @@ void setup() {
 void print_loop(unsigned long now_ms) {
     static bool led_state = false;
 
-        digitalClockDisplay();
-        Serial.print(F(", ")); Serial.print(now_ms/1000);
-        float hval = ((float) prd_h0 ); 
-        hval = hval / N_IRQ;
-        prd_h0 = 0; cnt_h0 = 0;
-        Serial.print(F(", ")); Serial.print(hval);
-        //float tval = ((float) pwm_t0 ); // cnt_t0; 
-        float tval = (float) prd_t0; 
-        tval = tval / N_IRQ;
-        Serial.print(F(", ")); Serial.print(tval);
+    digitalClockDisplay();
+    Serial.print(F(", ")); Serial.print(now_ms/1000);
+    float hval = ((float) prd_h0 );
+    hval = hval / N_IRQ;
+    prd_h0 = 0; cnt_h0 = 0;
+    Serial.print(F(", ")); Serial.print(hval);
+    //float tval = ((float) pwm_t0 ); // cnt_t0;
+    float tval = (float) prd_t0; 
+    tval = tval / N_IRQ;
+    Serial.print(F(", ")); Serial.print(tval);
 
-        hval = (float) prd_hlt; 
-        hval = hval / N_IRQ;
-        Serial.print(F(", ")); Serial.print(hval);
-        tval = (float) prd_tlt; 
-        tval = tval / N_IRQ;
-        Serial.print(F(", ")); Serial.print(tval);
+    hval = (float) prd_hlt;
+    hval = hval / N_IRQ;
+    Serial.print(F(", ")); Serial.print(hval);
+    tval = (float) prd_tlt;
+    tval = tval / N_IRQ;
+    Serial.print(F(", ")); Serial.print(tval);
 
-        hval = (float) prd_hrb; 
-        hval = hval / N_IRQ;
-        Serial.print(F(", ")); Serial.print(hval);
-        tval = (float) prd_trb; 
-        tval = tval / N_IRQ;
-        Serial.print(F(", ")); Serial.print(tval);
+    hval = (float) prd_hrb;
+    hval = hval / N_IRQ;
+    Serial.print(F(", ")); Serial.print(hval);
+    tval = (float) prd_trb;
+    tval = tval / N_IRQ;
+    Serial.print(F(", ")); Serial.print(tval);
 
-        hval = (float) prd_hrt; 
-        hval = hval / N_IRQ;
-        Serial.print(F(", ")); Serial.print(hval);
-        tval = (float) prd_trt; 
-        tval = tval / N_IRQ;
-        Serial.print(F(", ")); Serial.print(tval);
+    hval = (float) prd_hrt;
+    hval = hval / N_IRQ;
+    Serial.print(F(", ")); Serial.print(hval);
+    tval = (float) prd_trt;
+    tval = tval / N_IRQ;
+    Serial.print(F(", ")); Serial.print(tval);
 
-        Serial.print(F(", ")); Serial.print(cnt_m);
+    Serial.print(F(", ")); Serial.print(cnt_m);
 
-        Serial.print(F(", ")); Serial.println(relayState);
-        //Serial.println(F(", 0"));
+    Serial.print(F(", ")); Serial.println(relayState);
+    //Serial.println(F(", 0"));
 
-        digitalWrite(LED_BUILTIN, led_state);
-        led_state = not led_state;
-    	prev_time_h0 = micros();
-	enableInterrupt(H0_PIN, h0_falling, FALLING);
-	ena_sensor_irq = millis(); // start Interrupt Cycle
-	t0 = true; hlt = true; tlt = true; hrb = true; trb = true; hrt = true; trt = true;  // enable irq flags
-    //}
-    //delay(1000);
-}
+    digitalWrite(LED_BUILTIN, led_state);
+    led_state = not led_state;
+    prev_time_h0 = micros();
+    enableInterrupt(H0_PIN, h0_falling, FALLING);
+    ena_sensor_irq = millis(); // start Interrupt Cycle
+    t0 = true; hlt = true; tlt = true; hrb = true; trb = true; hrt = true; trt = true;  // enable irq flags
+                                                                                        //}
+                                                                                        //delay(1000);
+    }
 
 void loop(){
     static unsigned long nextPtime = 0;
@@ -323,39 +320,39 @@ void loop(){
 
     unsigned long us = micros();
     if ((now_ms > ena_sensor_irq + 20) && t0){
-    	prev_time_t0 = us;
-    	enableInterrupt(T0_PIN, t0_falling, FALLING);
-	t0 = false;
+        prev_time_t0 = us;
+        enableInterrupt(T0_PIN, t0_falling, FALLING);
+        t0 = false;
     }
     if ((now_ms > ena_sensor_irq + 100) && hlt){
-    	prev_time_hlt = us;
-    	enableInterrupt(HLT_PIN, hlt_falling, FALLING);
-	hlt = false;
+        prev_time_hlt = us;
+        enableInterrupt(HLT_PIN, hlt_falling, FALLING);
+        hlt = false;
     }
     if ((now_ms > ena_sensor_irq + 150) && tlt){
-    	prev_time_tlt = us;
-    	enableInterrupt(TLT_PIN, tlt_falling, FALLING);
-	tlt = false;
+        prev_time_tlt = us;
+        enableInterrupt(TLT_PIN, tlt_falling, FALLING);
+        tlt = false;
     }
     if ((now_ms > ena_sensor_irq + 200) && hrb){
-    	prev_time_hrb = us;
-    	enableInterrupt(HRB_PIN, hrb_falling, FALLING);
-	hrb = false;
+        prev_time_hrb = us;
+        enableInterrupt(HRB_PIN, hrb_falling, FALLING);
+        hrb = false;
     }
     if ((now_ms > ena_sensor_irq + 4000) && trb){
-    	prev_time_trb = us;
-    	enableInterrupt(TRB_PIN, trb_falling, FALLING);
-	trb = false;
+        prev_time_trb = us;
+        enableInterrupt(TRB_PIN, trb_falling, FALLING);
+        trb = false;
     }
     if ((now_ms > ena_sensor_irq + 4050) && hrt){
-    	prev_time_hrt = us;
-    	enableInterrupt(HRT_PIN, hrt_falling, FALLING);
-	hrt = false;
+        prev_time_hrt = us;
+        enableInterrupt(HRT_PIN, hrt_falling, FALLING);
+        hrt = false;
     }
     if ((now_ms > ena_sensor_irq + 8000) && trt){
-    	prev_time_trt = us;
-    	enableInterrupt(TRT_PIN, trt_falling, FALLING);
-	trt = false;
+        prev_time_trt = us;
+        enableInterrupt(TRT_PIN, trt_falling, FALLING);
+        trt = false;
     }
     serial_commands_.ReadSerial();
     if ( now_ms > nextPtime ) {
