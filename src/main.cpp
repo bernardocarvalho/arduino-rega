@@ -35,7 +35,7 @@ const int HRB_PIN = A1;
  PB5 13 LED_BUILTIN
  */
 const int relayPin = 2; // PD2
-volatile bool relayState = false;
+bool relayState = false;
 const int M_PIN = 3;  // PD3 
 
 const int TRT_PIN = 6; // PD6 Yellow Sensor
@@ -44,20 +44,18 @@ unsigned long ena_irq,  ena_sensor_irq;  // in millis()
 
 unsigned long prev_time_h0, prev_time_t0, prd_t0, prd_h0;
 unsigned long cnt_t0=0, cnt_h0=0, cnt_m=0;
-bool t0, hlt, tlt, hrb, trb, hrt, trt;
-
-//volatile unsigned long cnt_t2, cnt_h2;
 
 volatile unsigned long prev_time_hlt, prev_time_tlt, prd_tlt, prd_hlt,
          cnt_hlt, cnt_tlt;
-volatile unsigned long prev_time_hrb, prev_time_trb, prd_trb, prd_hrb,
+unsigned long prev_time_hrb, prev_time_trb, prd_trb, prd_hrb,
          cnt_hrb, cnt_trb;
 unsigned long prev_time_hrt, prev_time_trt, prd_hrt, prd_trt,
               cnt_hrt, cnt_trt;
+bool t0, hlt, tlt, hrb, trb, hrt, trt;
 
 const int irq_sleep = 1000; // 1 sec
 
-time_t stop_valve = 0, next_rega = 0;
+time_t stop_valve = 0, next_water = 0;
 
 void printDigits(int digits){
     // utility function for digital clock display: prints preceding colon and leading 0
@@ -104,12 +102,15 @@ void cmd_datetime_set(SerialCommands* sender) {
     time_t ts = strtoul(ts_str, NULL, 0); //atoi(ts_str);
     setTime(ts);
     time_t t = now();
-    //sender->GetSerial()->println(ts);
+    next_water = t + 24UL * 3600UL; // wait one day
+    stop_valve = 0; // 
+    sender->GetSerial()->print(F("My time is:"));
     sender->GetSerial()->println(t);
 }
 
 //called for ON command
 void cmd_relay_on(SerialCommands* sender) {
+    const time_t water_interval = 24UL * 3600UL; // in sec
     char * min_str = sender->Next();
     if (min_str == NULL) {
         sender->GetSerial()->println("ERROR Minute Arg");
@@ -117,8 +118,8 @@ void cmd_relay_on(SerialCommands* sender) {
     }
     int min = atoi(min_str);
     //stop_valve = millis() + 60000 * min;
-    stop_valve = now() + 60 * min;
-    next_rega  = now() + 24 * 3600; // Next day, same hour
+    stop_valve = now() + 60UL * min;
+    next_water  = now() + water_interval; // 24 * 3600; // Next day, same hour
     relayState = true;
     digitalWrite(relayPin, relayState);
     sender->GetSerial()->print(F("Relay is on for: "));
@@ -231,7 +232,7 @@ void setup() {
     Serial.print(F("Hello, now is "));
 
     //setTime(hr,min,sec,day,month,yr); // Another way to set
-    setTime(18,10,1,13,10,2022); 
+    setTime(00,10,1,19,10,2022); 
     time_t t = now(); // Store the current time in time 
                       // get Linux date : date +%s
     Serial.println(t);
@@ -239,6 +240,7 @@ void setup() {
 
     enableInterrupt(H0_PIN, h0_falling, FALLING);
     enableInterrupt(M_PIN, m_falling, FALLING);
+    next_water = t + 48UL * 3600UL; // wait two days
     stop_valve = 0; // in millis
     ena_sensor_irq= millis();
 }
@@ -281,7 +283,6 @@ void print_loop(unsigned long now_ms) {
     Serial.print(F(", ")); Serial.print(cnt_m);
 
     Serial.print(F(", ")); Serial.println(relayState);
-    //Serial.println(F(", 0"));
 
     digitalWrite(LED_BUILTIN, led_state);
     led_state = not led_state;
@@ -289,13 +290,12 @@ void print_loop(unsigned long now_ms) {
     enableInterrupt(H0_PIN, h0_falling, FALLING);
     ena_sensor_irq = millis(); // start Interrupt Cycle
     t0 = true; hlt = true; tlt = true; hrb = true; trb = true; hrt = true; trt = true;  // enable irq flags
-                                                                                        //}
-                                                                                        //delay(1000);
-    }
+    //delay(1000);
+}
 
 void loop(){
     static unsigned long nextPtime = 0;
-    const long print_interval = 30 * 1000;
+    const long print_interval = 30 * 1000; // in millis
 
     unsigned long now_ms = millis();	
     if (now_ms > ena_irq){  // debouncing 
@@ -304,7 +304,8 @@ void loop(){
     }
 
     time_t now_ts = now();
-    if (now_ts > next_rega){
+    if (now_ts > next_water){
+	next_water += 24UL * 3600UL; // repeat next day
         relayState = true;
         digitalWrite(relayPin, relayState);
         stop_valve = now_ts + 60;
