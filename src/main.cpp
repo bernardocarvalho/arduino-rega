@@ -36,13 +36,13 @@ const int HRT_PIN = 7;
 
 const int TRB_PIN = A0; // PC0 Yellow Sensor
 const int HRB_PIN = A1;
-const int TLT_PIN = NULL; //A2; // PC2 Yellow Sensor
-const int HLT_PIN = NULL; //A3; // PC3 Blue
+const int TLT_PIN = A2; //A2; // PC2 Yellow Sensor. NOT Used
+const int HLT_PIN = A3; //A3; // PC3 Blue
+const int HAD_PIN = A2; // PC2
 
 const int T0_PIN = SCL; //  PC5/A5
 const int H0_PIN = SDA; //  PC4/A4 Blue wire on sensor
 
-const int HA6_PIN = A2;
 
 bool relayState = false;
 
@@ -59,10 +59,13 @@ unsigned long prev_time_hrt, prev_time_trt, prd_hrt, prd_trt,
               cnt_hrt, cnt_trt;
 bool t0, hlt, tlt, hrb, trb, hrt, trt;
 
-const int irq_sleep = 1000; // 1 sec
-const int WATER_AUTO = 60; // in sec. Auto water/ day
+const int irq_sleep = 1000UL; // 1 sec
+const int WATER_AUTO = 60UL; // in sec. Auto water/ day
 
 time_t stop_valve = 0, next_water = 0;
+
+// Funtion Prototype
+void print_loop(unsigned long now_ms);
 
 void printDigits(int digits){
     // utility function for digital clock display: prints preceding colon and leading 0
@@ -72,7 +75,7 @@ void printDigits(int digits){
     Serial.print(digits);
 }
 
-void digitalClockDisplay(){
+void digitalClockPrint(){
     // digital clock display of the time
     Serial.print(day());
     Serial.print("-");
@@ -83,7 +86,6 @@ void digitalClockDisplay(){
     Serial.print(hour());
     printDigits(minute());
     printDigits(second());
-    //Serial.print(", "); 
 }
 
 char serial_command_buffer_[32];
@@ -111,7 +113,7 @@ void cmd_datetime_set(SerialCommands* sender) {
     time_t t = now();
     next_water = t + 24UL * 3600UL; // wait one day
     stop_valve = 0; // 
-    sender->GetSerial()->print(F("My time is:"));
+    sender->GetSerial()->print(F("My time now is: "));
     sender->GetSerial()->println(t);
 }
 
@@ -124,7 +126,6 @@ void cmd_relay_on(SerialCommands* sender) {
         return;
     }
     int min = atoi(min_str);
-    //stop_valve = millis() + 60000 * min;
     stop_valve = now() + 60UL * min;
     next_water  = now() + water_interval; // 24 * 3600; // Next day, same hour
     relayState = true;
@@ -140,12 +141,20 @@ void cmd_relay_off(SerialCommands* sender) {
     sender->GetSerial()->println("relay is off");
 }
 
+void cmd_print(SerialCommands* sender) {
+    unsigned long now_ms = millis();	
+    print_loop(now_ms);
+    //sender->GetSerial()->println("off");
+}
+
 //Note: Commands are case sensitive
 SerialCommand cmd_relay_on_("ON", cmd_relay_on); // requires one argument
 SerialCommand cmd_relay_off_("OFF", cmd_relay_off);
 SerialCommand cmd_datetime_set_("TS", cmd_datetime_set); // requires one argument
+/// Add one_key commands 
+SerialCommand cmd_print_("p", cmd_print, true);
 
-// Funtion prototypes
+// IRQ Funtion 
 void t0_falling() {
     unsigned long us;
     if(cnt_t0++ > N_IRQ) {
@@ -217,8 +226,8 @@ void setup() {
     Serial.begin(115200);
     pinMode(H0_PIN, INPUT_PULLUP);
     pinMode(T0_PIN, INPUT_PULLUP);
-    pinMode(HLT_PIN, INPUT_PULLUP);
-    pinMode(TLT_PIN, INPUT_PULLUP);
+//    pinMode(HLT_PIN, INPUT_PULLUP);
+//    pinMode(TLT_PIN, INPUT_PULLUP);
     pinMode(HRB_PIN, INPUT_PULLUP);
     pinMode(TRB_PIN, INPUT_PULLUP);
     pinMode(HRT_PIN, INPUT_PULLUP);
@@ -235,34 +244,33 @@ void setup() {
     serial_commands_.AddCommand(&cmd_relay_on_);
     serial_commands_.AddCommand(&cmd_relay_off_);
     serial_commands_.AddCommand(&cmd_datetime_set_);
+    serial_commands_.AddCommand(&cmd_print_);
 
     Serial.print(F("Hello, now is "));
 
     //setTime(hr,min,sec,day,month,yr); // Another way to set
-    setTime(00,10,1,19,10,2022); 
-    time_t t = now(); // Store the current time in time 
+    setTime(00,10,1,1,11,2022); 
+    time_t t = now(); // Store the current time in time (UTC)
                       // get Linux date : date +%s
     Serial.println(t);
-    Serial.println(F("timestamp,sec,Hum_0,Temp_0,Hum_LT,Temp_LT,Hum_RB,Temp_RB,Hum_RT,Temp_RT,H20_Meas,H2O_Pump"));
+    Serial.println(F("timestamp,sec,Hum_0,Temp_0,Hum_LT,Temp_LT,Hum_RB,Temp_RB,Hum_RT,Temp_RT,H20_Meas,H2O_Pump,H_ADC"));
 
     enableInterrupt(H0_PIN, h0_falling, FALLING);
     enableInterrupt(M_PIN, m_falling, FALLING);
-    next_water = t + 48UL * 3600UL; // wait two days
+    next_water = t + 48UL * 3600UL; // wait two days on Starting
     stop_valve = 0; // in sec
     ena_sensor_irq= millis();
 }
 
 void print_loop(unsigned long now_ms) {
-    static bool led_state = false;
     int sensorA6Value = 0;
 
-    digitalClockDisplay();
+    digitalClockPrint();
     Serial.print(F(", ")); Serial.print(now_ms/1000);
     float hval = ((float) prd_h0 );
     hval = hval / N_IRQ;
     prd_h0 = 0; cnt_h0 = 0;
     Serial.print(F(", ")); Serial.print(hval);
-    //float tval = ((float) pwm_t0 ); // cnt_t0;
     float tval = (float) prd_t0; 
     tval = tval / N_IRQ;
     Serial.print(F(", ")); Serial.print(tval);
@@ -292,34 +300,28 @@ void print_loop(unsigned long now_ms) {
 
     Serial.print(F(", ")); Serial.print(relayState);
 
-    sensorA6Value = analogRead(HA6_PIN);
+    sensorA6Value = analogRead(HAD_PIN);
     Serial.print(F(", ")); Serial.println(sensorA6Value);
 
-    digitalWrite(LED_BUILTIN, led_state);
-    led_state = not led_state;
-    prev_time_h0 = micros();
-    enableInterrupt(H0_PIN, h0_falling, FALLING);
-    ena_sensor_irq = millis(); // start Interrupt Cycle
-    t0 = true; hlt = false; tlt = false; hrb = true; trb = true; hrt = true; trt = true;  // enable irq flags
-    //t0 = true; hlt = true; tlt = true; hrb = true; trb = true; hrt = true; trt = true;  // enable irq flags
-    //delay(1000);
 }
-const int T0_WAIT =  400; 
-const int HLT_WAIT =  T0_WAIT + 100; 
-const int TLT_WAIT =  HLT_WAIT + 400; 
-const int HRB_WAIT =  TLT_WAIT + 100; 
-const int TRB_WAIT =  HRB_WAIT + 400; 
-const int HRT_WAIT =  TRB_WAIT + 100; 
-const int TRT_WAIT =  HRT_WAIT + 400; 
+
+const int T0_WAIT =  400UL; 
+const int HLT_WAIT =  T0_WAIT + 100UL; 
+const int TLT_WAIT =  HLT_WAIT + 100UL; 
+const int HRB_WAIT =  TLT_WAIT + 100UL; 
+const int TRB_WAIT =  HRB_WAIT + 400UL; 
+const int HRT_WAIT =  TRB_WAIT + 100UL; 
+const int TRT_WAIT =  HRT_WAIT + 400UL; 
 
 void loop(){
     static unsigned long nextPtime = 0;
-    const long print_interval = 30 * 1000; // in millis
+    const long print_interval = 30 * 1000UL; // in millis
+    static bool led_state = false;
 
     unsigned long now_ms = millis();	
     if (now_ms > ena_irq){  // debouncing 
         enableInterrupt(M_PIN, m_falling, FALLING);
-        ena_irq += 1000000; // run once until next interrupt.  ~ 1000 s
+        ena_irq += 1000000UL; // run once until next interrupt.  ~ 1000 s
     }
 
     time_t now_ts = now();
@@ -373,7 +375,15 @@ void loop(){
     serial_commands_.ReadSerial();
     if ( now_ms > nextPtime ) {
         nextPtime = now_ms + print_interval;
-        print_loop(now_ms);
+	digitalWrite(LED_BUILTIN, led_state);
+	led_state = not led_state;
+	prev_time_h0 = micros();
+	enableInterrupt(H0_PIN, h0_falling, FALLING);
+	ena_sensor_irq = millis(); // start Interrupt Cycle
+	t0 = true; hlt = false; tlt = false; hrb = true; trb = true; hrt = true; trt = true;  // enable irq flags
+    //t0 = true; hlt = true; tlt = true; hrb = true; trb = true; hrt = true; trt = true;  // enable irq flags
+	if ((hour(now_ts) < 1) || (hour(now_ts) > 8))  // Do no print 1AM -> 8AM
+	    print_loop(now_ms);
     }
 }
 
