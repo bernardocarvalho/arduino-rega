@@ -1,4 +1,6 @@
 // vim: sta:et:sw=4:ts=4:sts=4
+// https://www.seeedstudio.com/Seeeduino-Lotus-V1-1-ATMega328-Board-with-Grove-Interface.html
+// Seeeduino Lotus V1.1
 #include <Arduino.h>
 // https://github.com/GreyGnome/EnableInterrupt/wiki/Usage#Fast_Start
 // https://github.com/ppedro74/Arduino-SerialCommands
@@ -17,14 +19,6 @@
  */
 const int N_IRQ = 20;
 
-const int T0_PIN = SCL; //  PC5/A5
-const int H0_PIN = SDA; //  PC4/A4 Blue wire on sensor
-
-const int TLT_PIN = A2; // PC2 Yellow Sensor
-const int HLT_PIN = A3; // PC3 Blue
-
-const int TRB_PIN = A0; // PC0 Yellow Sensor
-const int HRB_PIN = A1;
 /*
  * https://docs.arduino.cc/hardware/uno-rev3
  D0  RX
@@ -35,11 +29,23 @@ const int HRB_PIN = A1;
  PB5 13 LED_BUILTIN
  */
 const int relayPin = 2; // PD2
-bool relayState = false;
 const int M_PIN = 3;  // PD3 
 
 const int TRT_PIN = 6; // PD6 Yellow Sensor
 const int HRT_PIN = 7;
+
+const int TRB_PIN = A0; // PC0 Yellow Sensor
+const int HRB_PIN = A1;
+const int TLT_PIN = NULL; //A2; // PC2 Yellow Sensor
+const int HLT_PIN = NULL; //A3; // PC3 Blue
+
+const int T0_PIN = SCL; //  PC5/A5
+const int H0_PIN = SDA; //  PC4/A4 Blue wire on sensor
+
+const int HA6_PIN = A2;
+
+bool relayState = false;
+
 unsigned long ena_irq,  ena_sensor_irq;  // in millis()
 
 unsigned long prev_time_h0, prev_time_t0, prd_t0, prd_h0;
@@ -54,6 +60,7 @@ unsigned long prev_time_hrt, prev_time_trt, prd_hrt, prd_trt,
 bool t0, hlt, tlt, hrb, trb, hrt, trt;
 
 const int irq_sleep = 1000; // 1 sec
+const int WATER_AUTO = 60; // in sec. Auto water/ day
 
 time_t stop_valve = 0, next_water = 0;
 
@@ -241,12 +248,13 @@ void setup() {
     enableInterrupt(H0_PIN, h0_falling, FALLING);
     enableInterrupt(M_PIN, m_falling, FALLING);
     next_water = t + 48UL * 3600UL; // wait two days
-    stop_valve = 0; // in millis
+    stop_valve = 0; // in sec
     ena_sensor_irq= millis();
 }
 
 void print_loop(unsigned long now_ms) {
     static bool led_state = false;
+    int sensorA6Value = 0;
 
     digitalClockDisplay();
     Serial.print(F(", ")); Serial.print(now_ms/1000);
@@ -260,10 +268,10 @@ void print_loop(unsigned long now_ms) {
     Serial.print(F(", ")); Serial.print(tval);
 
     hval = (float) prd_hlt;
-    hval = hval / N_IRQ;
+    hval = 0; //hval / N_IRQ;
     Serial.print(F(", ")); Serial.print(hval);
     tval = (float) prd_tlt;
-    tval = tval / N_IRQ;
+    tval = 0; // tval / N_IRQ;
     Serial.print(F(", ")); Serial.print(tval);
 
     hval = (float) prd_hrb;
@@ -282,16 +290,27 @@ void print_loop(unsigned long now_ms) {
 
     Serial.print(F(", ")); Serial.print(cnt_m);
 
-    Serial.print(F(", ")); Serial.println(relayState);
+    Serial.print(F(", ")); Serial.print(relayState);
+
+    sensorA6Value = analogRead(HA6_PIN);
+    Serial.print(F(", ")); Serial.println(sensorA6Value);
 
     digitalWrite(LED_BUILTIN, led_state);
     led_state = not led_state;
     prev_time_h0 = micros();
     enableInterrupt(H0_PIN, h0_falling, FALLING);
     ena_sensor_irq = millis(); // start Interrupt Cycle
-    t0 = true; hlt = true; tlt = true; hrb = true; trb = true; hrt = true; trt = true;  // enable irq flags
+    t0 = true; hlt = false; tlt = false; hrb = true; trb = true; hrt = true; trt = true;  // enable irq flags
+    //t0 = true; hlt = true; tlt = true; hrb = true; trb = true; hrt = true; trt = true;  // enable irq flags
     //delay(1000);
 }
+const int T0_WAIT =  400; 
+const int HLT_WAIT =  T0_WAIT + 100; 
+const int TLT_WAIT =  HLT_WAIT + 400; 
+const int HRB_WAIT =  TLT_WAIT + 100; 
+const int TRB_WAIT =  HRB_WAIT + 400; 
+const int HRT_WAIT =  TRB_WAIT + 100; 
+const int TRT_WAIT =  HRT_WAIT + 400; 
 
 void loop(){
     static unsigned long nextPtime = 0;
@@ -308,7 +327,7 @@ void loop(){
 	next_water += 24UL * 3600UL; // repeat next day
         relayState = true;
         digitalWrite(relayPin, relayState);
-        stop_valve = now_ts + 60;
+        stop_valve = now_ts + WATER_AUTO;
     }
     if (now_ts > stop_valve){
         relayState = false;
@@ -316,37 +335,37 @@ void loop(){
     }
 
     unsigned long us = micros();
-    if ((now_ms > ena_sensor_irq + 20) && t0){
+    if ((now_ms > ena_sensor_irq + T0_WAIT) && t0){
         prev_time_t0 = us;
         enableInterrupt(T0_PIN, t0_falling, FALLING);
         t0 = false;
     }
-    if ((now_ms > ena_sensor_irq + 100) && hlt){
+    if ((now_ms > ena_sensor_irq + HLT_WAIT) && hlt){
         prev_time_hlt = us;
         enableInterrupt(HLT_PIN, hlt_falling, FALLING);
         hlt = false;
     }
-    if ((now_ms > ena_sensor_irq + 150) && tlt){
+    if ((now_ms > ena_sensor_irq + TLT_WAIT) && tlt){
         prev_time_tlt = us;
         enableInterrupt(TLT_PIN, tlt_falling, FALLING);
         tlt = false;
     }
-    if ((now_ms > ena_sensor_irq + 200) && hrb){
+    if ((now_ms > ena_sensor_irq + HRB_WAIT) && hrb){
         prev_time_hrb = us;
         enableInterrupt(HRB_PIN, hrb_falling, FALLING);
         hrb = false;
     }
-    if ((now_ms > ena_sensor_irq + 4000) && trb){
+    if ((now_ms > ena_sensor_irq + TRB_WAIT) && trb){
         prev_time_trb = us;
         enableInterrupt(TRB_PIN, trb_falling, FALLING);
         trb = false;
     }
-    if ((now_ms > ena_sensor_irq + 4050) && hrt){
+    if ((now_ms > ena_sensor_irq + HRT_WAIT) && hrt){
         prev_time_hrt = us;
         enableInterrupt(HRT_PIN, hrt_falling, FALLING);
         hrt = false;
     }
-    if ((now_ms > ena_sensor_irq + 8000) && trt){
+    if ((now_ms > ena_sensor_irq + TRT_WAIT) && trt){
         prev_time_trt = us;
         enableInterrupt(TRT_PIN, trt_falling, FALLING);
         trt = false;
